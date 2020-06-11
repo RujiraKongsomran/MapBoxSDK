@@ -4,14 +4,32 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;
+import android.os.Handler;
 
 import com.mapbox.mapboxsdk.Mapbox;
 import com.mapbox.mapboxsdk.constants.Style;
 import com.mapbox.mapboxsdk.maps.MapView;
+import com.mapbox.mapboxsdk.maps.MapboxMap;
+import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
+import com.mapbox.mapboxsdk.style.layers.SymbolLayer;
+import com.mapbox.mapboxsdk.style.sources.GeoJsonSource;
+
+import java.net.MalformedURLException;
+import java.net.URL;
+
+import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.iconImage;
 
 public class MainActivity extends AppCompatActivity {
 
     private MapView mapView;
+    private MapboxMap map;
+
+    private Handler handler;
+    private Runnable runnable;
+
+    // Constant
+    private final String ID = "wanderdrone";
+    private final String URL_GET_DATA = "https://wanderdrone.appspot.com/";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -22,6 +40,30 @@ public class MainActivity extends AppCompatActivity {
         mapView = (MapView) findViewById(R.id.mapView);
         mapView.onCreate(savedInstanceState);
         mapView.setStyleUrl(Style.MAPBOX_STREETS);
+
+        mapView.getMapAsync(new OnMapReadyCallback() {
+            @Override
+            public void onMapReady(MapboxMap mapBoxMap) {
+                map = mapBoxMap;
+
+                try {
+                    map.addSource(new GeoJsonSource(ID, new URL(URL_GET_DATA)));
+                } catch (MalformedURLException e) {
+                    e.printStackTrace();
+                }
+
+                // Add layer
+                SymbolLayer layer = new SymbolLayer(ID, ID);
+                layer.setProperties(iconImage("rocket-15"));
+                mapBoxMap.addLayer(layer);
+
+                // Refresh Data
+                handler = new Handler();
+                runnable = new RefreshData(map, handler);
+                handler.postDelayed(runnable, 2000);
+
+            }
+        });
     }
 
     @Override
@@ -58,5 +100,21 @@ public class MainActivity extends AppCompatActivity {
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         mapView.onSaveInstanceState(outState);
+    }
+
+    private class RefreshData implements Runnable {
+        private MapboxMap map;
+        private Handler handler;
+
+        public RefreshData(MapboxMap map, Handler handler) {
+            this.map = map;
+            this.handler = handler;
+        }
+
+        @Override
+        public void run() {
+            ((GeoJsonSource) map.getSource(ID)).setUrl(URL_GET_DATA);
+            handler.postDelayed(this, 2000);
+        }
     }
 }
